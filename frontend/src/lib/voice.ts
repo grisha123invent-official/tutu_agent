@@ -184,8 +184,11 @@ export class VoiceController {
     src.buffer = buffer
     src.connect(this.playCtx.destination)
     const now = this.playCtx.currentTime
-    // keep a small lead so scheduled chunks don't underrun
-    if (this.playHead < now + 0.06) this.playHead = now + 0.06
+    // джиттер-буфер: держим запас ~180мс, чтобы рывки/потери на нестабильном
+    // канале (напр. РФ → сервер) не рвали воспроизведение. Чуть больше задержка,
+    // зато голос не «булькает» и не обрывается.
+    const JITTER = 0.18
+    if (this.playHead < now + JITTER) this.playHead = now + JITTER
     src.start(this.playHead)
     this.playHead += buffer.duration
     this.scheduled.push(src)
