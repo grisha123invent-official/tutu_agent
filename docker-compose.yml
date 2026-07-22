@@ -1,0 +1,27 @@
+services:
+  backend:
+    build: ./backend
+    env_file: ./backend/.env
+    restart: unless-stopped
+    expose:
+      - "8787"
+
+  caddy:
+    build:
+      context: .
+      dockerfile: Caddy.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}
+    depends_on:
+      - backend
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

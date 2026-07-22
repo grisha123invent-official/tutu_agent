@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
+import { startSearchSound, stopSearchSound } from '../lib/searchSound'
 import type { AssistantMessage } from '../types'
 
 /* ---- liquid glass orb ---- */
@@ -123,10 +124,38 @@ export default function VoiceMode({
   onToggleMute: () => void
 }) {
   const messages = useStore((s) => s.messages)
-  const voiceStatus = useStore((s) => s.voiceStatus)
+  const webSearching = useStore((s) => s.webSearching)
   const textRef = useRef<HTMLDivElement>(null)
 
-  const thinking = !!voiceStatus && !speaking
+  // Красивая загрузка + звук — ТОЛЬКО для медленного веб-поиска (интернет).
+  // Быстрый поиск билетов через MCP ничего не грузит.
+  // Держим минимум ~2с, чтобы точно было видно/слышно, и гасим, когда пошёл голос.
+  const [searching, setSearching] = useState(false)
+  const searchStart = useRef(0)
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const MIN_SEARCH_MS = 2000
+
+  useEffect(() => {
+    if (searchTimer.current) {
+      clearTimeout(searchTimer.current)
+      searchTimer.current = null
+    }
+    if (speaking) {
+      setSearching(false)
+      return
+    }
+    if (webSearching) {
+      if (!searching) searchStart.current = Date.now()
+      setSearching(true)
+    } else if (searching) {
+      const elapsed = Date.now() - searchStart.current
+      const left = Math.max(0, MIN_SEARCH_MS - elapsed)
+      searchTimer.current = setTimeout(() => setSearching(false), left)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [webSearching, speaking])
+
+  const thinking = searching
   const activeOrb = speaking || thinking
 
   const status = connecting
@@ -134,7 +163,7 @@ export default function VoiceMode({
     : muted
       ? 'Микрофон выключен'
       : thinking
-        ? voiceStatus
+        ? 'Ищу в интернете…'
         : speaking
           ? 'Отвечаю…'
           : 'Слушаю…'
@@ -149,19 +178,53 @@ export default function VoiceMode({
     textRef.current?.scrollTo({ top: textRef.current.scrollHeight, behavior: 'smooth' })
   }, [bigText])
 
+  // мягкий «поисковый» звук, пока ассистент ищет (думает и не говорит)
+  useEffect(() => {
+    if (thinking) startSearchSound()
+    else stopSearchSound()
+    return () => stopSearchSound()
+  }, [thinking])
+
   return (
     <div className="lg-stage relative flex min-h-[500px] flex-1 flex-col">
       {/* header */}
       <div className="lg-up flex items-center justify-center gap-2 pt-5">
-        <span className={`h-2 w-2 rounded-full ${connecting ? 'bg-tutu-orange' : 'bg-tutu-green'} ${!connecting ? 'animate-pulse' : ''}`} />
-        <span className="max-w-[80%] truncate text-[12px] font-semibold uppercase tracking-[0.16em] text-tutu-muted">
+        <span className={`h-2 w-2 rounded-full ${connecting ? 'bg-tutu-orange' : thinking ? 'bg-tutu-violet' : 'bg-tutu-green'} animate-pulse`} />
+        <span className="max-w-[70%] truncate text-[12px] font-semibold uppercase tracking-[0.16em] text-tutu-muted">
           {status}
         </span>
+        {/* бегущие точки, пока идёт поиск */}
+        {thinking && (
+          <span className="flex items-center gap-1">
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="h-1.5 w-1.5 rounded-full bg-tutu-violet"
+                style={{ animation: `voice-wave 0.9s ease-in-out ${i * 0.15}s infinite` }}
+              />
+            ))}
+          </span>
+        )}
       </div>
 
-      {/* orb */}
+      {/* orb + радарные волны во время поиска */}
       <div className="lg-in flex justify-center pt-6">
-        <LiquidOrb active={activeOrb} />
+        <div className="relative h-44 w-44">
+          {thinking && (
+            <>
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="voice-ring absolute inset-0 rounded-full ring-2 ring-tutu-violet/50"
+                  style={{ animationDelay: `${i * 1.05}s` }}
+                />
+              ))}
+              {/* мягкое пульсирующее свечение под шаром */}
+              <span className="voice-glow-speaking absolute -inset-3 rounded-full bg-tutu-violet/20 blur-2xl" />
+            </>
+          )}
+          <LiquidOrb active={activeOrb} />
+        </div>
       </div>
 
       {/* live text with top fade */}

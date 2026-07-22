@@ -237,6 +237,7 @@ async function searchOffers(args: any, send: Send): Promise<string> {
 
 async function webPlaces(args: any, send: Send, openai: OpenAI): Promise<string> {
   send({ t: 'status', text: 'Ищу информацию в интернете…' })
+  send({ t: 'web_search', value: true }) // включаем красивую загрузку (интернет — медленно)
   const id = 'place_' + Date.now()
   try {
     const resp = await openai.responses.create({
@@ -258,6 +259,8 @@ async function webPlaces(args: any, send: Send, openai: OpenAI): Promise<string>
   } catch (e) {
     // fallback: no web tool available -> let the model answer from its own knowledge
     return `Веб-поиск недоступен (${(e as Error).message}). Ответь из своих знаний, кратко и честно предупредив, что данные могут быть неактуальны.`
+  } finally {
+    send({ t: 'web_search', value: false }) // гасим красивую загрузку
   }
 }
 

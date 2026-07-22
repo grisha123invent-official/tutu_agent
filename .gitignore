@@ -8,10 +8,11 @@ dist-ssr/
 **/dist/
 *.tsbuildinfo
 
-# secrets / env — НИКОГДА не коммитим (кроме .env.example)
+# secrets / env — НИКОГДА не коммитим (кроме примеров)
 .env
 .env.*
 !.env.example
+!.env.deploy.example
 **/.env
 !**/.env.example
 

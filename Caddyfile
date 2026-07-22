@@ -1,0 +1,21 @@
+# Домен подставляется из переменной окружения DOMAIN (см. .env).
+# Caddy сам получит и продлит TLS-сертификат Let's Encrypt.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# API и WebSocket → бэкенд (Node). reverse_proxy сам поднимает WS-upgrade.
+	@api path /api/*
+	handle @api {
+		reverse_proxy backend:8787
+	}
+	handle /ws {
+		reverse_proxy backend:8787
+	}
+
+	# всё остальное — статика SPA (React), с фолбэком на index.html
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

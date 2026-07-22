@@ -1,5 +1,6 @@
 import { sendRaw, setAudioHandler, setFlushHandler } from './ws'
 import { useStore } from '../store'
+import { setSearchSoundContext, stopSearchSound } from './searchSound'
 
 const SAMPLE_RATE = 24000
 
@@ -108,6 +109,8 @@ export class VoiceController {
 
     // playback context — НЕ форсируем частоту (Safari), используем родную + ресемпл
     this.playCtx = makeContext()
+    // звук поиска играет через ЭТОТ ЖЕ контекст (иначе конфликт → голос пропадает)
+    setSearchSoundContext(this.playCtx)
     try {
       await this.playCtx.resume()
     } catch {}
@@ -176,7 +179,7 @@ export class VoiceController {
     const rate = this.playCtx.sampleRate
     const data = resample(raw, SAMPLE_RATE, rate)
     const buffer = this.playCtx.createBuffer(1, data.length, rate)
-    buffer.copyToChannel(data, 0)
+    buffer.getChannelData(0).set(data)
     const src = this.playCtx.createBufferSource()
     src.buffer = buffer
     src.connect(this.playCtx.destination)
@@ -209,6 +212,8 @@ export class VoiceController {
     sendRaw({ t: 'voice_stop' })
     setAudioHandler(null)
     setFlushHandler(null)
+    stopSearchSound()
+    setSearchSoundContext(null)
     this.flush()
     try {
       this.processor?.disconnect()

@@ -7,6 +7,29 @@ import VoiceMode from './VoiceMode'
 import { fmtPrice } from '../lib/format'
 import type { PlaceInfo } from '../types'
 
+/** Лёгкий inline-markdown: **жирный**, *курсив*, `код`. Без библиотек. */
+function RichText({ text }: { text: string }) {
+  // разбиваем по **…**, *…*, `…` — сохраняя разделители
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*\n]+\*|`[^`]+`)/g)
+  return (
+    <>
+      {parts.map((p, i) => {
+        if (p.startsWith('**') && p.endsWith('**'))
+          return <strong key={i} className="font-bold">{p.slice(2, -2)}</strong>
+        if (p.startsWith('`') && p.endsWith('`'))
+          return (
+            <code key={i} className="rounded bg-tutu-violet/10 px-1 py-0.5 text-[13px]">
+              {p.slice(1, -1)}
+            </code>
+          )
+        if (p.startsWith('*') && p.endsWith('*'))
+          return <em key={i} className="italic">{p.slice(1, -1)}</em>
+        return <span key={i}>{p}</span>
+      })}
+    </>
+  )
+}
+
 function PlaceCard({ place }: { place: PlaceInfo }) {
   return (
     <div className="mt-2 rounded-2xl bg-white/55 p-3 ring-1 ring-tutu-violet/20 backdrop-blur-md">
@@ -213,7 +236,7 @@ export default function AssistantPanel() {
                       </div>
                     )}
                     <div className="whitespace-pre-wrap rounded-2xl rounded-bl-md bg-white/75 px-4 py-2.5 text-[14.5px] text-tutu-ink ring-1 ring-tutu-violet/20 backdrop-blur-md">
-                      {m.content || (thinking ? '…' : '')}
+                      {m.content ? <RichText text={m.content} /> : thinking ? '…' : ''}
                     </div>
                     {m.placeInfo && <PlaceCard place={m.placeInfo} />}
                   </div>

@@ -7,6 +7,7 @@ type ServerMsg =
   | { t: 'assistant_done'; id: string }
   | { t: 'status'; text: string }
   | { t: 'searching'; value: boolean }
+  | { t: 'web_search'; value: boolean }
   | { t: 'action'; action: UiAction }
   | { t: 'offers'; offers: Offer[]; label: string }
   | { t: 'place'; id: string; place: PlaceInfo }
@@ -88,6 +89,9 @@ function handle(msg: ServerMsg) {
     case 'searching':
       s.setSearching(msg.value)
       break
+    case 'web_search':
+      s.setWebSearching(msg.value)
+      break
     case 'action':
       // small stagger so the user sees fields being filled one by one
       s.applyAction(msg.action)
@@ -106,10 +110,16 @@ function handle(msg: ServerMsg) {
       // пользователь перебил — мгновенно обрываем проигрывание ответа
       flushHandler?.()
       break
-    case 'user_transcript':
-      if (msg.text)
-        s.addMessage({ id: 'u_' + Date.now(), role: 'user', content: msg.text })
+    case 'user_transcript': {
+      const t = msg.text?.trim()
+      if (!t) break
+      // отсекаем англо-«галлюцинации» whisper на тишине/шуме:
+      // в русском приложении реальная реплика содержит кириллицу
+      const hasCyrillic = /[а-яё]/i.test(t)
+      if (!hasCyrillic && t.length < 40) break
+      s.addMessage({ id: 'u_' + Date.now(), role: 'user', content: t })
       break
+    }
     case 'voice_ready':
       voiceStateHandler?.(true)
       break

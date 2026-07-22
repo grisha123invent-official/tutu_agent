@@ -46,6 +46,8 @@ interface StoreState {
   voiceStatus: string
   /** реально ли сейчас играет голос ассистента (по аудио, не по «thinking») */
   voicePlaying: boolean
+  /** идёт МЕДЛЕННЫЙ веб-поиск (интернет) — для красивой загрузки/звука */
+  webSearching: boolean
   seatmapOffer: Offer | null
 
   setPage: (p: Page) => void
@@ -66,6 +68,7 @@ interface StoreState {
   togglePanel: (v?: boolean) => void
   setVoiceStatus: (s: string) => void
   setVoicePlaying: (v: boolean) => void
+  setWebSearching: (v: boolean) => void
   setSeatmapOffer: (o: Offer | null) => void
 }
 
@@ -84,6 +87,7 @@ export const useStore = create<StoreState>((set, get) => ({
   panelOpen: false,
   voiceStatus: '',
   voicePlaying: false,
+  webSearching: false,
   seatmapOffer: null,
 
   setPage: (page) => set({ page }),
@@ -139,5 +143,6 @@ export const useStore = create<StoreState>((set, get) => ({
   togglePanel: (v) => set((s) => ({ panelOpen: v ?? !s.panelOpen })),
   setVoiceStatus: (voiceStatus) => set({ voiceStatus }),
   setVoicePlaying: (voicePlaying) => set({ voicePlaying }),
+  setWebSearching: (webSearching) => set({ webSearching }),
   setSeatmapOffer: (seatmapOffer) => set({ seatmapOffer }),
 }))
