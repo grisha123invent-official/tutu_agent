@@ -1,8 +1,9 @@
 import OpenAI from 'openai'
 import { toolSchemas, runTool, type Send } from './tools.js'
 import { getToolNames } from './mcp.js'
+import { CHAT_MODEL } from './providers/llm.js'
 
-const MODEL = process.env.OPENAI_MODEL || 'gpt-4o'
+const MODEL = CHAT_MODEL
 
 export function systemPrompt(): string {
   const today = new Date().toISOString().slice(0, 10)
@@ -46,7 +47,7 @@ export async function runAgent(
   openai: OpenAI,
   history: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
   send: Send,
-) {
+): Promise<string> {
   // ensure system prompt is first
   if (!history.length || history[0].role !== 'system') {
     history.unshift({ role: 'system', content: systemPrompt() })
@@ -54,6 +55,7 @@ export async function runAgent(
 
   const msgId = 'a_' + Date.now()
   send({ t: 'assistant_start', id: msgId })
+  let finalText = ''
 
   const MAX_STEPS = 6
   for (let step = 0; step < MAX_STEPS; step++) {
@@ -121,9 +123,13 @@ export async function runAgent(
     }
 
     // plain text answer -> record and finish
-    if (content) history.push({ role: 'assistant', content })
+    if (content) {
+      history.push({ role: 'assistant', content })
+      finalText = content
+    }
     break
   }
 
   send({ t: 'assistant_done', id: msgId })
+  return finalText
 }

@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import { mcpSearch } from './search.js'
 import { getPlaybook } from './extras.js'
+import { webSearch } from './providers/websearch.js'
 import { type Offer, type Transport } from './normalize.js'
 
 export type Send = (msg: any) => void
@@ -240,41 +241,16 @@ async function webPlaces(args: any, send: Send, openai: OpenAI): Promise<string>
   send({ t: 'web_search', value: true }) // включаем красивую загрузку (интернет — медленно)
   const id = 'place_' + Date.now()
   try {
-    const resp = await openai.responses.create({
-      model: 'gpt-4o',
-      tools: [{ type: 'web_search_preview' } as any],
-      input: `Кратко и по делу ответь на русском на запрос путешественника: «${args.query}».
-Верни СТРОГО JSON: {"title": "...", "summary": "1-2 предложения", "bullets": ["пункт", "пункт", "пункт"], "sourceUrl": "https://..."}. Без markdown.`,
-    })
-    const text = (resp as any).output_text || ''
-    const json = extractJson(text)
-    const place = {
-      title: json.title || args.title || 'Информация',
-      summary: json.summary || text.slice(0, 200),
-      bullets: Array.isArray(json.bullets) ? json.bullets.slice(0, 5) : [],
-      sourceUrl: json.sourceUrl,
-    }
+    // провайдер веб-поиска: openai (Responses) или self-hosted searxng — см. providers/websearch.ts
+    const place = await webSearch(args.query, args.title, openai)
     send({ t: 'place', id, place })
     return `Показал карточку места «${place.title}». Кратко: ${place.summary} ${place.bullets.join('; ')}`
   } catch (e) {
-    // fallback: no web tool available -> let the model answer from its own knowledge
+    // fallback: веб-поиск недоступен -> пусть модель ответит из своих знаний
     return `Веб-поиск недоступен (${(e as Error).message}). Ответь из своих знаний, кратко и честно предупредив, что данные могут быть неактуальны.`
   } finally {
     send({ t: 'web_search', value: false }) // гасим красивую загрузку
   }
-}
-
-function extractJson(s: string): any {
-  try {
-    return JSON.parse(s)
-  } catch {}
-  const m = s.match(/\{[\s\S]*\}/)
-  if (m) {
-    try {
-      return JSON.parse(m[0])
-    } catch {}
-  }
-  return {}
 }
 
 function sleep(ms: number) {

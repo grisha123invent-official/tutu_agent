@@ -13,8 +13,10 @@ dist-ssr/
 .env.*
 !.env.example
 !.env.deploy.example
+!.env.local-models.example
 **/.env
 !**/.env.example
+!**/.env.local-models.example
 
 # logs
 *.log

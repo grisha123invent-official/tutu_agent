@@ -1,0 +1,64 @@
+# Локальные модель-серверы для ассистента Туту (LLM + STT + TTS + веб-поиск).
+# Всё — OpenAI-совместимое, поэтому бэкенд подключается одним лишь env (см. .env.local-models.example).
+#
+# Запуск:  docker compose -f infra/local-models/docker-compose.yml up -d
+# Затем в бэкенде выставить LLM_BASE_URL / STT_BASE_URL / TTS_BASE_URL (см. docs/LOCAL_MODELS.md).
+#
+# GPU: раскомментируйте блоки `deploy.resources` (нужен nvidia-container-toolkit).
+
+name: tutu-local-models
+
+services:
+  # ---------- LLM (чат + tool-calling для MCP) ----------
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "11434:11434" # OpenAI-совместимый API на http://<host>:11434/v1
+    volumes:
+      - ollama:/root/.ollama
+    # --- GPU (опционально) ---
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
+
+  # ---------- STT (распознавание речи, Whisper) ----------
+  # speaches = faster-whisper за OpenAI-совместимым API (/v1/audio/transcriptions)
+  stt:
+    image: ghcr.io/speaches-ai/speaches:latest-cpu
+    restart: unless-stopped
+    ports:
+      - "8001:8000" # http://<host>:8001/v1
+    volumes:
+      - stt-cache:/home/ubuntu/.cache/huggingface
+    # для GPU: образ ...:latest-cuda + блок deploy.resources как выше
+
+  # ---------- TTS (синтез речи) ----------
+  # openedai-speech = OpenAI-совместимый /v1/audio/speech, принимает голоса alloy/echo/…
+  tts:
+    image: ghcr.io/matatonic/openedai-speech:latest
+    restart: unless-stopped
+    ports:
+      - "8002:8000" # http://<host>:8002/v1
+    volumes:
+      - tts-voices:/app/voices
+      - tts-config:/app/config
+
+  # ---------- Веб-поиск (опционально, вместо OpenAI web_search) ----------
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080" # http://<host>:8080
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+    volumes:
+      - searxng:/etc/searxng
+
+volumes:
+  ollama:
+  stt-cache:
+  tts-voices:
+  tts-config:
+  searxng:
