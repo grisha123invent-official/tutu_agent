@@ -123,7 +123,9 @@ wss.on('connection', (ws: WebSocket) => {
       if (VOICE_PROVIDER === 'local') {
         voice = new LocalVoiceBridge(openai, send)
       } else {
-        if (!process.env.OPENAI_API_KEY) return send({ t: 'error', text: 'Нет OPENAI_API_KEY' })
+        // realtime: облачный OpenAI ИЛИ локальный совместимый сервер (REALTIME_URL)
+        if (!process.env.OPENAI_API_KEY && !process.env.REALTIME_URL)
+          return send({ t: 'error', text: 'Нет OPENAI_API_KEY или REALTIME_URL' })
         voice = new RealtimeBridge(openai, send)
       }
       await voice.start(data.history || [])

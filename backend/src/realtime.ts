@@ -3,8 +3,14 @@ import OpenAI from 'openai'
 import { toolSchemas, runTool, type Send } from './tools.js'
 import { systemPrompt } from './agent.js'
 
-const RT_MODEL = process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime'
-const RT_VOICE = process.env.OPENAI_REALTIME_VOICE || 'alloy'
+// Endpoint Realtime. По умолчанию — облачный OpenAI. Чтобы использовать
+// ЛОКАЛЬНЫЙ OpenAI-Realtime-совместимый сервер (LocalAI / Speaches /
+// huggingface speech-to-speech), задайте REALTIME_URL, напр.:
+//   REALTIME_URL=ws://localhost:8765/v1/realtime
+// Тот же мост, тот же протокол событий — меняется только адрес.
+const RT_URL = process.env.REALTIME_URL?.trim()
+const RT_MODEL = process.env.REALTIME_MODEL || process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime'
+const RT_VOICE = process.env.REALTIME_VOICE || process.env.OPENAI_REALTIME_VOICE || 'alloy'
 
 /** Convert our chat tool schemas to the Realtime tool format. */
 function realtimeTools() {
@@ -50,14 +56,19 @@ export class RealtimeBridge {
 
   async start(history: { role: string; content: string }[] = []) {
     this.history = history
-    const key = process.env.OPENAI_API_KEY
-    if (!key) {
-      this.send({ t: 'error', text: 'Нет OPENAI_API_KEY для голосового режима' })
+    const key = process.env.REALTIME_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim()
+    const isLocal = !!RT_URL
+    if (!isLocal && !key) {
+      this.send({ t: 'error', text: 'Нет OPENAI_API_KEY (или REALTIME_URL для локального) для голосового режима' })
       return
     }
-    // GA Realtime API (no beta header)
-    const url = `wss://api.openai.com/v1/realtime?model=${encodeURIComponent(RT_MODEL)}`
-    const ws = new WebSocket(url, { headers: { Authorization: `Bearer ${key}` } })
+    // Облачный OpenAI Realtime ИЛИ локальный совместимый сервер (по REALTIME_URL)
+    const base = RT_URL || 'wss://api.openai.com/v1/realtime'
+    const url = base + (base.includes('?') ? '&' : '?') + 'model=' + encodeURIComponent(RT_MODEL)
+    // локальные серверы обычно без авторизации; ключ шлём только если он есть
+    const headers: Record<string, string> = {}
+    if (key) headers.Authorization = `Bearer ${key}`
+    const ws = new WebSocket(url, { headers })
     this.rt = ws
 
     ws.on('open', () => {
